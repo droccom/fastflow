@@ -56,43 +56,12 @@ public:
 			in_comm(in_comm), out_comm(out_comm) {
 	}
 
-protected:
-#if 0
-	/* @brief shares with a downstream node, according to communicator logic
-	 * @ingroup GFF-bb-api
-	 *
-	 * To be called from svc_init() or svc().
-	 * It does *not* activate downstream svc().
-	 */
-	template<typename element_t>
-	void share(const gam::public_ptr<element_t> &to_emit)
-	{
-		Node::put_via(out_comm, to_emit);
-	}
-
-	/* @brief broadcast to all downstream nodes
-	 * @ingroup GFF-bb-api
-	 *
-	 * To be called from svc_init().
-	 * It does *not* activate downstream svc() or svc().
-	 */
-	template<typename element_t>
-	void broadcast(const gam::public_ptr<element_t> &to_emit)
-	{
-		Node::broadcast_via(out_comm, to_emit);
-	}
-
-	/* @brief get a public pointer shared/broadcasted from upstream node
-	 * @ingroup GFF-bb-api
-	 *
-	 * To be called from svc_init() or svc().
-	 */
-	template<typename collected_t>
-	gam::public_ptr<collected_t> get()
-	{
-		return Node::get_via<InComm, gam::public_ptr<collected_t>>(in_comm);
-	}
-#endif
+    // constructor for feedback-aware termination
+    Filter(InComm &in_comm, OutComm &out_comm,
+           gam::executor_id fb_cardinality)
+        : in_comm(in_comm),
+          out_comm(out_comm),
+          passive_eos_(fb_cardinality) {}
 
 private:
 	void set_links() {
@@ -116,6 +85,8 @@ private:
 		token_t out;
 
 		bool svc_termination = false;
+		auto eos2hlt = in_comm.internals.in_cardinality() - passive_eos_;
+		gam::executor_id received_eos = 0;
 		while (true) {
 			/* prepare local input pointer */
 			GFF_PROFILER_HRT(t0);
@@ -152,8 +123,9 @@ private:
 			else {
 				//got eos from upstream communicator
 				GFF_LOGLN_OS("FLT got eos");
+				assert(received_eos < eos2hlt);
 
-				if (++received_eos == in_comm.internals.in_cardinality())
+				if (++received_eos == eos2hlt)
 					break;
 			}
 
@@ -185,8 +157,8 @@ private:
 
 	InComm &in_comm;
 	OutComm &out_comm;
-	gam::executor_id received_eos = 0;
 	Logic logic;
+	const gam::executor_id passive_eos_ = 0;
 	unsigned long long token_id = 0;
 };
 

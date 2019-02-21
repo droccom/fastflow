@@ -108,7 +108,7 @@ int main(int argc, char * argv[])
 {
 	std::vector<gff::OneToOne> comms(NSTAGES);
 
-	gff::add(Stage1(comms.back(), comms[0]));
+	gff::add(Stage1(comms.back(), comms[0], 1 /* feedback cardinality */));
 
 	for(size_t i = 1; i < NSTAGES; ++i)
 		gff::add(Stage2(comms[i-1], comms[i]));
